@@ -9,7 +9,7 @@ AIGC:
     ReservedCode2: 3044022004e16906f2b637a4c3a0fffefea4aca6a3f7d95743bf2eddd9aa6ebe9d25686502204cec0aa40e38b75f015f4a1002dd6a2297703610d79d66093d72d6e8d1c3def8
 ---
 
-# 德州扑克下注模拟器 v1.1.0
+# 德州扑克下注模拟器 v1.1.1
 
 Texas Hold'em Betting Simulator - 多人实时下注系统
 
@@ -23,7 +23,6 @@ Texas Hold'em Betting Simulator - 多人实时下注系统
 - **底池系统**: 自动计算底池和当前下注额
 - **计时器**: 30秒操作超时自动弃牌
 - **断线重连**: 支持玩家断线后重新连接
-- **聊天功能**: 房间内实时聊天
 - **美观UI**: 专业扑克桌设计，流畅动画
 
 ## 支持的操作
@@ -106,7 +105,7 @@ docker-compose up -d
 | leaveRoom | - | 离开房间 |
 | startGame | - | 开始游戏 |
 | playerAction | { action, amount } | 玩家操作 |
-| chatMessage | { message } | 发送聊天消息 |
+| chatMessage | { message } | ~~发送聊天消息~~ (已移除) |
 
 ### 服务器 → 客户端
 
@@ -123,7 +122,7 @@ docker-compose up -d
 | timerUpdate | { currentPlayerSocketId, timerRemaining } | 计时器更新 |
 | playerDisconnected | { socketId, playerName } | 玩家断线 |
 | playerReconnected | { socketId, playerName } | 玩家重连 |
-| chatMessage | { socketId, playerName, message, timestamp } | 聊天消息 |
+| chatMessage | { socketId, playerName, message, timestamp } | ~~聊天消息~~ (已移除) |
 | gameReady | { roomInfo } | 等待新一局 |
 
 ## 技术栈
