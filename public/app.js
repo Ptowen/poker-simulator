@@ -63,7 +63,7 @@ let currentPlayerName = null;
 let isHost = false;
 let currentBetType = null;
 let timerInterval = null;
-let window.gameData = null;
+let gameData = null;
 
 function showView(viewName) {
   Object.values(views).forEach(view => view.classList.add('hidden'));
@@ -108,24 +108,14 @@ function initLobby() {
     }
     socket.emit('joinRoom', { playerName: name, roomId: roomId });
   });
-
-  elements.playerName.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') elements.createRoomBtn.click();
-  });
-
-  elements.roomCode.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') elements.joinRoomBtn.click();
-  });
 }
 
 function initWaitingRoom() {
   elements.leaveRoomBtn.addEventListener('click', () => {
-    socket.emit('leaveRoom', (response) => {
-      if (response.success) {
-        resetState();
-        showView('lobby');
-      }
-    });
+    socket.emit('leaveRoom');
+    currentRoomId = null;
+    isHost = false;
+    showView('lobby');
   });
 
   elements.copyRoomCode.addEventListener('click', () => {
@@ -136,7 +126,7 @@ function initWaitingRoom() {
   });
 
   elements.startGameBtn.addEventListener('click', () => {
-    socket.emit('startGame', {});
+    socket.emit('startGame');
   });
 }
 
@@ -182,9 +172,12 @@ function initGame() {
     if (e.target === elements.betModal) closeBetModal();
   });
 
-  elements.chatSendBtn.addEventListener('click', sendChatMessage);
-  elements.chatInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendChatMessage();
+  elements.chatSendBtn.addEventListener('click', () => {
+    const message = elements.chatInput.value.trim();
+    if (message) {
+      socket.emit('chatMessage', { message });
+      elements.chatInput.value = '';
+    }
   });
 
   elements.resultClose.addEventListener('click', () => {
@@ -192,34 +185,21 @@ function initGame() {
   });
 }
 
-function sendChatMessage() {
-  const message = elements.chatInput.value.trim();
-  if (!message) return;
-  socket.emit('chatMessage', { message }, (response) => {
-    if (!response.success) {
-      showError(response.message);
-    }
-  });
-  elements.chatInput.value = '';
-}
-
 function openBetModal(type) {
   currentBetType = type;
   elements.modalTitle.textContent = type === 'bet' ? '下注' : '加注';
 
   const player = getCurrentPlayer();
-  if (player) {
-    elements.modalChips.textContent = player.chips;
+  elements.modalChips.textContent = player.chips;
 
-    let minAmount;
-    if (type === 'bet') {
-      minAmount = player.roomInfo?.minBet || 10;
-    } else {
-      minAmount = (player.roomInfo?.currentBetAmount || 0) * 2;
-    }
-    elements.betAmountInput.min = minAmount;
-    elements.betAmountInput.value = Math.max(minAmount, 10);
+  let minAmount;
+  if (type === 'bet') {
+    minAmount = gameData?.minBet || 10;
+  } else {
+    minAmount = (gameData?.currentBetAmount || 0) * 2;
   }
+  elements.betAmountInput.min = minAmount;
+  elements.betAmountInput.value = Math.max(minAmount, 10);
 
   elements.betModal.classList.remove('hidden');
 }
@@ -230,29 +210,14 @@ function closeBetModal() {
 }
 
 function performAction(action, amount = null) {
-  socket.emit('playerAction', { action, amount }, (response) => {
-    if (!response.success) {
-      showError(response.message);
-    }
-  });
+  socket.emit('playerAction', { action, amount });
 }
 
 function getCurrentPlayer() {
+  const player = gameData?.players?.find(p => p.socketId === currentPlayerSocketId);
   return {
-    socketId: currentPlayerSocketId,
-    name: currentPlayerName,
-    chips: window.gameData?.players?.find(p => p.socketId === currentPlayerSocketId)?.chips || 1000,
-    roomInfo: window.gameData
+    chips: player?.chips || 1000
   };
-}
-
-function resetState() {
-  currentRoomId = null;
-  isHost = false;
-  if (timerInterval) {
-    clearInterval(timerInterval);
-    timerInterval = null;
-  }
 }
 
 function renderWaitingPlayers(players, hostSocketId) {
@@ -321,7 +286,9 @@ function renderGamePlayers(players, currentPlayerSocketId, currentPlayerId) {
   });
 }
 
-function updateActionButtons(actions) {
+function updateActionButtons(data) {
+  const actions = data.actions || data;
+
   elements.checkBtn.disabled = !actions.canCheck;
   elements.betBtn.disabled = !actions.canBet;
   elements.callBtn.disabled = !actions.canCall;
@@ -330,14 +297,6 @@ function updateActionButtons(actions) {
 
   const callAmount = actions.callAmount || 0;
   elements.callAmount.textContent = `跟注 ${callAmount}`;
-
-  if (actions.isCurrentPlayer) {
-    elements.turnIndicator.textContent = '轮到你了！';
-    elements.turnIndicator.classList.add('your-turn');
-  } else {
-    elements.turnIndicator.textContent = `等待 ${actions.currentPlayerName || '玩家'} 行动...`;
-    elements.turnIndicator.classList.remove('your-turn');
-  }
 }
 
 function updateTimer(seconds) {
@@ -369,7 +328,7 @@ function updateTimer(seconds) {
 }
 
 function updateRoomInfo(roomInfo) {
-  window.gameData = roomInfo;
+  gameData = roomInfo;
 
   elements.gameRoomCode.textContent = roomInfo.roomId;
   elements.bettingRound.textContent = roomInfo.bettingRound + 1;
@@ -410,9 +369,10 @@ socket.on('disconnect', () => {
   showToast('连接已断开');
 });
 
-socket.on('roomCreated', (data) => {
+socket.on('createRoom', (data) => {
   if (data.success) {
     currentRoomId = data.roomId;
+    currentPlayerSocketId = socket.id;
     isHost = true;
     currentPlayerName = elements.playerName.value.trim();
     updateWaitingRoom(data.roomInfo);
@@ -423,9 +383,11 @@ socket.on('roomCreated', (data) => {
   }
 });
 
-socket.on('roomJoined', (data) => {
+socket.on('joinRoom', (data) => {
   if (data.success) {
     currentRoomId = data.roomId;
+    currentPlayerSocketId = socket.id;
+    isHost = data.roomInfo.hostSocketId === socket.id;
     currentPlayerName = elements.playerName.value.trim();
     updateWaitingRoom(data.roomInfo);
     showView('waiting');
@@ -484,7 +446,17 @@ socket.on('playerActed', (data) => {
 
 socket.on('turnChanged', (data) => {
   updateRoomInfo(data.roomInfo);
-  updateActionButtons(data.actions);
+  updateActionButtons(data);
+
+  const isMyTurn = data.currentPlayerSocketId === currentPlayerSocketId;
+  if (isMyTurn) {
+    elements.turnIndicator.textContent = '轮到你了！';
+    elements.turnIndicator.classList.add('your-turn');
+  } else {
+    elements.turnIndicator.textContent = `等待 ${data.currentPlayerName || '玩家'} 行动...`;
+    elements.turnIndicator.classList.remove('your-turn');
+  }
+
   updateTimer(data.timerRemaining || 30);
 });
 
@@ -522,45 +494,6 @@ socket.on('chatMessage', (data) => {
 socket.on('connect_error', (err) => {
   showError('连接失败，请检查服务器');
 });
-
-const originalEmit = socket.emit;
-socket.emit = function(event, data, callback) {
-  if (event === 'createRoom' && typeof callback === 'function') {
-    const wrappedCallback = (response) => {
-      if (response.success) {
-        currentRoomId = response.roomId;
-        currentPlayerSocketId = socket.id;
-        isHost = true;
-        currentPlayerName = data.playerName;
-        updateWaitingRoom(response.roomInfo);
-        showView('waiting');
-        showToast('房间创建成功');
-      } else {
-        showError(response.message);
-      }
-      callback(response);
-    };
-    originalEmit.call(this, event, data, wrappedCallback);
-  } else if (event === 'joinRoom' && typeof callback === 'function') {
-    const wrappedCallback = (response) => {
-      if (response.success) {
-        currentRoomId = response.roomId;
-        currentPlayerSocketId = socket.id;
-        isHost = response.roomInfo.hostSocketId === socket.id;
-        currentPlayerName = data.playerName;
-        updateWaitingRoom(response.roomInfo);
-        showView('waiting');
-        showToast('加入房间成功');
-      } else {
-        showError(response.message);
-      }
-      callback(response);
-    };
-    originalEmit.call(this, event, data, wrappedCallback);
-  } else {
-    originalEmit.call(this, event, data, callback);
-  }
-};
 
 document.addEventListener('DOMContentLoaded', () => {
   initLobby();

@@ -88,7 +88,8 @@ class SocketEvents {
 
     console.log(`房间创建: ${roomId} by ${playerName}`);
 
-    this.sendSuccess(callback, {
+    socket.emit('createRoom', {
+      success: true,
       roomId: roomId,
       roomInfo: room.getInfo()
     });
@@ -137,7 +138,8 @@ class SocketEvents {
       roomInfo: room.getInfo()
     });
 
-    this.sendSuccess(callback, {
+    socket.emit('joinRoom', {
+      success: true,
       roomId: roomId,
       roomInfo: room.getInfo()
     });
@@ -253,7 +255,7 @@ class SocketEvents {
     this.sendPlayerUpdate(roomId);
     this.startTurnTimer(roomId);
 
-    this.sendSuccess(callback, { success: true });
+    socket.emit('startGame', { success: true, roomInfo: room.getInfo() });
   }
 
   handlePlayerAction(socket, data, callback) {
