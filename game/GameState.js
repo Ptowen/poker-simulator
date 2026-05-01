@@ -70,7 +70,7 @@ class GameState {
   }
 
   canBet(socketId) {
-    return this.currentBetAmount === 0 && this.getCurrentPlayerSocketId() === socketId;
+    return this.currentBetAmount === 0 && this.getCurrentPlayerSocketId() === socketId && this.hasChips(socketId);
   }
 
   canCheck(socketId) {
@@ -80,13 +80,15 @@ class GameState {
 
   canCall(socketId) {
     const playerBet = this.currentBets.get(socketId) || 0;
-    return playerBet < this.currentBetAmount && this.getCurrentPlayerSocketId() === socketId;
+    const callAmount = this.currentBetAmount - playerBet;
+    return callAmount > 0 && this.getCurrentPlayerSocketId() === socketId && this.hasChips(socketId);
   }
 
   canRaise(socketId) {
     const player = this.getPlayer(socketId);
     const playerBet = this.currentBets.get(socketId) || 0;
-    return this.getCurrentPlayerSocketId() === socketId && player && player.chips > 0;
+    const callAmount = this.currentBetAmount - playerBet;
+    return this.getCurrentPlayerSocketId() === socketId && this.hasChips(socketId) && callAmount > 0 && player.chips > callAmount;
   }
 
   bet(socketId, amount) {
@@ -263,6 +265,11 @@ class GameState {
   getCallAmount(socketId) {
     const playerBet = this.currentBets.get(socketId) || 0;
     return Math.max(0, this.currentBetAmount - playerBet);
+  }
+
+  hasChips(socketId) {
+    const player = this.getPlayer(socketId);
+    return player && player.chips > 0;
   }
 }
 

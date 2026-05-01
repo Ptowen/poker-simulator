@@ -31,11 +31,15 @@ class SocketEvents {
       });
 
       socket.on('getRooms', (callback) => {
-        this.handleGetRooms(callback);
+        this.handleGetRooms(socket, callback);
       });
 
       socket.on('getRoomInfo', (data, callback) => {
         this.handleGetRoomInfo(socket, data, callback);
+      });
+
+      socket.on('refreshRooms', (callback) => {
+        this.handleGetRooms(socket, callback);
       });
 
       socket.on('startGame', (callback) => {
@@ -44,10 +48,6 @@ class SocketEvents {
 
       socket.on('playerAction', (data, callback) => {
         this.handlePlayerAction(socket, data, callback);
-      });
-
-      socket.on('chatMessage', (data, callback) => {
-        this.handleChatMessage(socket, data, callback);
       });
 
       socket.on('requestReconnect', (data, callback) => {
@@ -189,7 +189,7 @@ class SocketEvents {
     console.log(`${playerName} 离开房间 ${roomId}`);
   }
 
-  handleGetRooms(callback) {
+  handleGetRooms(socket, callback) {
     const rooms = [];
     for (const [roomId, room] of this.rooms) {
       if (!room.gameStarted) {
@@ -200,7 +200,8 @@ class SocketEvents {
         });
       }
     }
-    this.sendSuccess(callback, { rooms: rooms });
+    socket.emit('roomList', { rooms: rooms });
+    if (callback) callback({ success: true, rooms: rooms });
   }
 
   handleGetRoomInfo(socket, data, callback) {
@@ -334,9 +335,11 @@ class SocketEvents {
       roomInfo: room.getInfo()
     });
 
+    console.log(`[DEBUG] isOnlyOnePlayerLeft: ${room.isOnlyOnePlayerLeft()}, isBettingRoundOver: ${room.gameState.isBettingRoundOver()}, activePlayers: ${room.gameState.activePlayers.length}`);
     if (room.isOnlyOnePlayerLeft()) {
       this.handleRoundEnd(roomId);
     } else if (room.gameState.isBettingRoundOver()) {
+      console.log(`[DEBUG] Calling handleBettingRoundEnd`);
       this.handleBettingRoundEnd(roomId);
     } else {
       const nextPlayerId = room.gameState.nextPlayer();
@@ -448,41 +451,6 @@ class SocketEvents {
         roomInfo: room.getInfo()
       });
     }
-  }
-
-  handleChatMessage(socket, data, callback) {
-    const roomId = this.playerRooms.get(socket.id);
-    if (!roomId) {
-      this.sendError(callback, '不在任何房间中');
-      return;
-    }
-
-    const room = this.rooms.get(roomId);
-    if (!room) {
-      this.sendError(callback, '房间不存在');
-      return;
-    }
-
-    const player = room.gameState.getPlayer(socket.id);
-    if (!player) {
-      this.sendError(callback, '玩家不存在');
-      return;
-    }
-
-    const { message } = data;
-    if (!message || message.trim().length === 0) {
-      this.sendError(callback, '消息不能为空');
-      return;
-    }
-
-    this.io.to(roomId).emit('chatMessage', {
-      socketId: socket.id,
-      playerName: player.name,
-      message: message.trim().substring(0, 200),
-      timestamp: Date.now()
-    });
-
-    this.sendSuccess(callback, { success: true });
   }
 
   handleReconnect(socket, data, callback) {

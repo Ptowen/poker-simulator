@@ -41,6 +41,16 @@
           </button>
         </div>
 
+        <div id="room-list-container" class="room-list-container">
+          <div class="room-list-header">
+            <h3>可用房间</h3>
+            <button id="refresh-rooms-btn" class="btn btn-small btn-secondary">刷新</button>
+          </div>
+          <div id="room-list" class="room-list">
+            <div class="loading-text">加载中...</div>
+          </div>
+        </div>
+
         <div id="error-message" class="error-message"></div>
       </div>
     </div>
@@ -91,13 +101,7 @@
 
       <div class="game-table">
         <div class="table-center">
-          <div class="pot-section">
-            <div class="pot-visual">
-              <div class="pot-chip"></div>
-              <div class="pot-chip"></div>
-              <div class="pot-chip"></div>
-            </div>
-          </div>
+<div class="pot-section">
         </div>
 
         <div id="game-players" class="game-players"></div>
@@ -132,14 +136,6 @@
             <span class="action-name">Fold</span>
             <span class="action-hint">弃牌</span>
           </button>
-        </div>
-      </div>
-
-      <div class="chat-area" id="chat-area">
-        <div class="chat-messages" id="chat-messages"></div>
-        <div class="chat-input-container">
-          <input type="text" id="chat-input" placeholder="输入消息..." maxlength="200">
-          <button id="chat-send-btn" class="btn btn-small">发送</button>
         </div>
       </div>
 

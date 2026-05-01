@@ -47,14 +47,13 @@ const elements = {
   toastMessage: document.getElementById('toast-message'),
   timerDisplay: document.getElementById('timer-display'),
   timerValue: document.getElementById('timer-value'),
-  chatArea: document.getElementById('chat-area'),
-  chatMessages: document.getElementById('chat-messages'),
-  chatInput: document.getElementById('chat-input'),
-  chatSendBtn: document.getElementById('chat-send-btn'),
   resultModal: document.getElementById('result-modal'),
   resultTitle: document.getElementById('result-title'),
   resultMessage: document.getElementById('result-message'),
-  resultClose: document.getElementById('result-close')
+  resultClose: document.getElementById('result-close'),
+  roomList: document.getElementById('room-list'),
+  refreshRoomsBtn: document.getElementById('refresh-rooms-btn'),
+  roomListContainer: document.getElementById('room-list-container')
 };
 
 let currentRoomId = null;
@@ -107,6 +106,10 @@ function initLobby() {
       return;
     }
     socket.emit('joinRoom', { playerName: name, roomId: roomId });
+  });
+
+  elements.refreshRoomsBtn.addEventListener('click', () => {
+    socket.emit('refreshRooms');
   });
 }
 
@@ -172,14 +175,6 @@ function initGame() {
     if (e.target === elements.betModal) closeBetModal();
   });
 
-  elements.chatSendBtn.addEventListener('click', () => {
-    const message = elements.chatInput.value.trim();
-    if (message) {
-      socket.emit('chatMessage', { message });
-      elements.chatInput.value = '';
-    }
-  });
-
   elements.resultClose.addEventListener('click', () => {
     elements.resultModal.classList.add('hidden');
   });
@@ -210,6 +205,11 @@ function closeBetModal() {
 }
 
 function performAction(action, amount = null) {
+  const player = getCurrentPlayer();
+  if (player.chips <= 0) {
+    showError('筹码用尽，不可下注');
+    return;
+  }
   socket.emit('playerAction', { action, amount });
 }
 
@@ -242,6 +242,42 @@ function renderWaitingPlayers(players, hostSocketId) {
   });
 
   elements.playerCount.textContent = `(${players.length}/8)`;
+}
+
+function renderRoomList(rooms) {
+  if (rooms.length === 0) {
+    elements.roomList.innerHTML = '<div class="no-rooms">暂无等待中的房间</div>';
+    return;
+  }
+
+  elements.roomList.innerHTML = '';
+
+  rooms.forEach(room => {
+    const roomEl = document.createElement('div');
+    roomEl.className = 'room-item';
+    roomEl.innerHTML = `
+      <div class="room-item-info">
+        <div class="room-item-id">房间号: <strong>${room.roomId}</strong></div>
+        <div class="room-item-players">${room.playerCount}/${room.maxPlayers} 人</div>
+      </div>
+      <button class="btn btn-small btn-primary room-join-btn">加入</button>
+    `;
+
+    roomEl.querySelector('.room-join-btn').addEventListener('click', () => {
+      const name = elements.playerName.value.trim();
+      if (!name) {
+        showError('请输入昵称');
+        return;
+      }
+      socket.emit('joinRoom', { playerName: name, roomId: room.roomId });
+    });
+
+    elements.roomList.appendChild(roomEl);
+  });
+}
+
+function handleRoomList(data) {
+  renderRoomList(data.rooms || []);
 }
 
 function renderGamePlayers(players, currentPlayerSocketId, currentPlayerId) {
@@ -350,15 +386,6 @@ function showResultModal(title, message) {
   elements.resultModal.classList.remove('hidden');
 }
 
-function addChatMessage(data) {
-  const msgEl = document.createElement('div');
-  msgEl.className = 'chat-message';
-  const time = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  msgEl.innerHTML = `<span class="name">${data.playerName}</span><span class="time">${time}</span><span class="text">${data.message}</span>`;
-  elements.chatMessages.appendChild(msgEl);
-  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-}
-
 socket.on('connect', () => {
   console.log('已连接到服务器');
   currentPlayerSocketId = socket.id;
@@ -427,7 +454,6 @@ socket.on('playerReconnected', (data) => {
 });
 
 socket.on('gameStarted', (data) => {
-  elements.chatArea.classList.remove('hidden');
   showView('game');
   updateRoomInfo(data.roomInfo);
   showToast('游戏开始！');
@@ -487,13 +513,11 @@ socket.on('gameReady', (data) => {
   showToast('准备开始新一局');
 });
 
-socket.on('chatMessage', (data) => {
-  addChatMessage(data);
-});
-
 socket.on('connect_error', (err) => {
   showError('连接失败，请检查服务器');
 });
+
+socket.on('roomList', handleRoomList);
 
 document.addEventListener('DOMContentLoaded', () => {
   initLobby();
@@ -502,5 +526,10 @@ document.addEventListener('DOMContentLoaded', () => {
   showView('lobby');
   elements.betModal.classList.add('hidden');
   elements.resultModal.classList.add('hidden');
-  elements.chatArea.classList.add('hidden');
+  socket.emit('getRooms');
+  setInterval(() => {
+    if (views.lobby && !views.lobby.classList.contains('hidden')) {
+      socket.emit('refreshRooms');
+    }
+  }, 5000);
 });
