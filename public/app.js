@@ -109,13 +109,16 @@ function openSettingsModal() {
   elements.timerInputValue.textContent = currentSettings.timer;
   elements.chipsInput.value = currentSettings.initialChips;
   elements.chipsValue.textContent = currentSettings.initialChips;
+
+  if (elements.settingsModal.parentElement.id !== 'app') {
+    document.getElementById('app').appendChild(elements.settingsModal);
+  }
+
   elements.settingsModal.classList.remove('hidden');
-  document.body.appendChild(elements.settingsModal);
 }
 
 function closeSettingsModal() {
   elements.settingsModal.classList.add('hidden');
-  document.getElementById('app').appendChild(elements.settingsModal);
 }
 
 function restoreDefaultSettings() {
@@ -208,18 +211,6 @@ function initWaitingRoom() {
     openSettingsModal();
   });
 
-  elements.settingsCancel.addEventListener('click', () => {
-    closeSettingsModal();
-  });
-
-  elements.settingsRestore.addEventListener('click', () => {
-    restoreDefaultSettings();
-  });
-
-  elements.settingsModal.addEventListener('click', (e) => {
-    if (e.target === elements.settingsModal) closeSettingsModal();
-  });
-
   elements.minBetInput.addEventListener('input', () => {
     elements.minBetValue.textContent = elements.minBetInput.value;
   });
@@ -240,6 +231,18 @@ function initWaitingRoom() {
     };
     socket.emit('updateSettings', { settings });
     closeSettingsModal();
+  });
+
+  elements.settingsCancel.addEventListener('click', () => {
+    closeSettingsModal();
+  });
+
+  elements.settingsRestore.addEventListener('click', () => {
+    restoreDefaultSettings();
+  });
+
+  elements.settingsModal.addEventListener('click', (e) => {
+    if (e.target === elements.settingsModal) closeSettingsModal();
   });
 }
 
