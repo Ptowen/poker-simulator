@@ -4,7 +4,11 @@
 
 const GameRoom = require('../game/GameRoom');
 
-const TIMER_DURATION = 30;
+const DEFAULT_SETTINGS = {
+  minBet: 10,
+  timer: 30,
+  initialChips: 1000
+};
 
 class SocketEvents {
   constructor(io) {
@@ -50,6 +54,10 @@ class SocketEvents {
         this.handlePlayerAction(socket, data, callback);
       });
 
+      socket.on('updateSettings', (data, callback) => {
+        this.handleUpdateSettings(socket, data, callback);
+      });
+
       socket.on('requestReconnect', (data, callback) => {
         this.handleReconnect(socket, data, callback);
       });
@@ -65,7 +73,7 @@ class SocketEvents {
   }
 
   handleCreateRoom(socket, data, callback) {
-    const { playerName } = data;
+    const { playerName, settings } = data;
 
     if (!playerName || playerName.trim().length === 0) {
       this.sendError(callback, '请输入昵称');
@@ -77,7 +85,13 @@ class SocketEvents {
       roomId = this.generateRoomId();
     } while (this.rooms.has(roomId));
 
-    const room = new GameRoom(roomId, socket.id);
+    const roomSettings = {
+      minBet: settings?.minBet || DEFAULT_SETTINGS.minBet,
+      timer: settings?.timer || DEFAULT_SETTINGS.timer,
+      initialChips: settings?.initialChips || DEFAULT_SETTINGS.initialChips
+    };
+
+    const room = new GameRoom(roomId, socket.id, roomSettings);
     room.addPlayer(socket.id, playerName.trim());
 
     this.rooms.set(roomId, room);
@@ -243,12 +257,6 @@ class SocketEvents {
       return;
     }
 
-    for (const [, player] of room.gameState.players) {
-      player.chips = 1000;
-      player.hasFolded = false;
-      player.hasActed = false;
-    }
-
     this.io.to(roomId).emit('gameStarted', {
       roomInfo: room.getInfo()
     });
@@ -257,6 +265,39 @@ class SocketEvents {
     this.startTurnTimer(roomId);
 
     socket.emit('startGame', { success: true, roomInfo: room.getInfo() });
+  }
+
+  handleUpdateSettings(socket, data, callback) {
+    const roomId = this.playerRooms.get(socket.id);
+    if (!roomId) {
+      this.sendError(callback, '不在任何房间中');
+      return;
+    }
+
+    const room = this.rooms.get(roomId);
+    if (!room) {
+      this.sendError(callback, '房间不存在');
+      return;
+    }
+
+    if (room.hostSocketId !== socket.id) {
+      this.sendError(callback, '只有房主可以更改配置');
+      return;
+    }
+
+    if (room.gameStarted) {
+      this.sendError(callback, '游戏已经开始，无法更改配置');
+      return;
+    }
+
+    const { settings } = data;
+    room.updateSettings(settings);
+
+    this.io.to(roomId).emit('settingsUpdated', {
+      settings: room.settings
+    });
+
+    this.sendSuccess(callback, { success: true, settings: room.settings });
   }
 
   handlePlayerAction(socket, data, callback) {
@@ -335,11 +376,9 @@ class SocketEvents {
       roomInfo: room.getInfo()
     });
 
-    console.log(`[DEBUG] isOnlyOnePlayerLeft: ${room.isOnlyOnePlayerLeft()}, isBettingRoundOver: ${room.gameState.isBettingRoundOver()}, activePlayers: ${room.gameState.activePlayers.length}`);
     if (room.isOnlyOnePlayerLeft()) {
       this.handleRoundEnd(roomId);
     } else if (room.gameState.isBettingRoundOver()) {
-      console.log(`[DEBUG] Calling handleBettingRoundEnd`);
       this.handleBettingRoundEnd(roomId);
     } else {
       const nextPlayerId = room.gameState.nextPlayer();
@@ -356,10 +395,11 @@ class SocketEvents {
     const room = this.rooms.get(roomId);
     if (!room) return;
 
+    const currentRound = room.gameState.bettingRound;
     room.gameState.startNewBettingRound();
 
     this.io.to(roomId).emit('bettingRoundEnded', {
-      round: room.gameState.bettingRound,
+      round: currentRound,
       roomInfo: room.getInfo()
     });
 
@@ -376,26 +416,22 @@ class SocketEvents {
     const winnerId = room.gameState.activePlayers[0];
     const winner = room.gameState.getPlayer(winnerId);
 
-    winner.chips += room.gameState.pot;
+    if (winner) {
+      winner.chips += room.gameState.pot;
+    }
 
     this.io.to(roomId).emit('roundEnded', {
       reason: 'allFolded',
-      winner: {
+      winner: winner ? {
         socketId: winnerId,
         name: winner.name,
         pot: room.gameState.pot
-      },
+      } : null,
       roomInfo: room.getInfo()
     });
 
     room.gameState.pot = 0;
-
-    setTimeout(() => {
-      room.resetGame();
-      this.io.to(roomId).emit('gameReady', {
-        roomInfo: room.getInfo()
-      });
-    }, 3000);
+    room.resetGame();
   }
 
   startTurnTimer(roomId) {
@@ -405,7 +441,8 @@ class SocketEvents {
     const currentPlayerId = room.gameState.getCurrentPlayerSocketId();
     if (!currentPlayerId) return;
 
-    room.gameState.startTimer(TIMER_DURATION, () => {
+    const timerDuration = room.settings.timer;
+    room.gameState.startTimer(timerDuration, () => {
       const currentPlayer = room.gameState.getCurrentPlayerSocketId();
       if (currentPlayer === currentPlayerId) {
         room.gameState.fold(currentPlayerId);
@@ -434,7 +471,7 @@ class SocketEvents {
 
     this.io.to(roomId).emit('timerUpdate', {
       currentPlayerSocketId: currentPlayerId,
-      timerRemaining: TIMER_DURATION
+      timerRemaining: timerDuration
     });
   }
 

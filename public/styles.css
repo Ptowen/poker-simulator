@@ -894,15 +894,15 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.95);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 9999;
 }
 
 .modal.hidden {
-  display: none;
+  display: none !important;
 }
 
 .modal-content {
@@ -1076,6 +1076,131 @@ body {
   background: var(--color-text-muted);
 }
 
+/* Action Log */
+.game-view-container {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.game-main-area {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.action-log {
+  width: 180px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  max-height: 450px;
+  display: flex;
+  flex-direction: column;
+}
+
+.log-header {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.log-entries {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.log-entry {
+  padding: 4px 0;
+  font-size: 0.8rem;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border);
+  line-height: 1.3;
+}
+
+.log-entry:last-child {
+  border-bottom: none;
+}
+
+.log-entry.round-start {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.log-entry.round-end {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
+.log-entry.winner {
+  color: var(--color-gold);
+  font-weight: 600;
+}
+
+.log-entry .player-name {
+  color: var(--color-secondary);
+}
+
+.log-entry .action-check { color: var(--color-primary); }
+.log-entry .action-bet { color: var(--color-chip-red); }
+.log-entry .action-call { color: var(--color-warning); }
+.log-entry .action-raise { color: var(--color-danger); }
+.log-entry .action-fold { color: var(--color-text-muted); }
+
+/* Settings Modal */
+.setting-item {
+  margin-bottom: 1rem;
+}
+
+.setting-item label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  color: var(--color-text);
+}
+
+.setting-item label span {
+  color: var(--color-gold);
+  font-weight: 600;
+}
+
+.setting-item input[type="range"] {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-border);
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.setting-item input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+}
+
+.setting-item input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  border: none;
+}
+
 /* Responsive */
 @media (max-width: 600px) {
   .lobby-container { padding: 1.5rem; }
@@ -1086,4 +1211,7 @@ body {
   .action-buttons { gap: 0.5rem; }
   .btn-action { min-width: 60px; padding: 0.5rem 0.75rem; }
   .card-slot { width: 45px; height: 65px; font-size: 1.2rem; }
+  .game-view-container { flex-direction: column; }
+  .game-main-area { width: 100%; }
+  .action-log { width: 100%; max-height: 150px; }
 }

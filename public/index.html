@@ -77,102 +77,138 @@
       <div class="waiting-actions">
         <p class="waiting-text">等待其他玩家加入...</p>
         <button id="start-game-btn" class="btn btn-primary btn-large" disabled>开始游戏</button>
+        <button id="settings-btn" class="btn btn-secondary">配置</button>
         <p class="hint">需要至少2名玩家才能开始</p>
       </div>
     </div>
 
     <div id="game-view" class="view hidden">
-      <div class="game-header">
-        <div class="game-info-left">
-          <span class="room-code-small">房间: <strong id="game-room-code"></strong></span>
-          <span class="round-info">第 <span id="betting-round">1</span> 轮下注</span>
+      <div class="game-view-container">
+        <div class="game-main-area">
+          <div class="game-header">
+            <div class="game-info-left">
+              <span class="room-code-small">房间: <strong id="game-room-code"></strong></span>
+              <span class="round-info">第 <span id="betting-round">1</span> 轮下注</span>
+            </div>
+            <div class="game-info-right">
+              <div class="pot-display">
+                <span class="pot-label">底池</span>
+                <span class="pot-amount" id="pot-amount">0</span>
+              </div>
+              <div class="current-bet-display">
+                <span class="bet-label">当前下注</span>
+                <span class="bet-amount" id="current-bet-amount">0</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="game-table">
+            <div class="table-center">
+              <div class="pot-section">
+            </div>
+
+            <div id="game-players" class="game-players"></div>
+          </div>
+
+          <div class="action-area">
+            <div id="timer-display" class="timer-display hidden">
+              <span id="timer-value">30</span>
+            </div>
+            <div id="action-info" class="action-info">
+              <span id="turn-indicator">等待开始...</span>
+            </div>
+
+            <div id="action-buttons" class="action-buttons">
+              <button id="check-btn" class="btn btn-action btn-check" disabled>
+                <span class="action-name">Check</span>
+                <span class="action-hint">过牌</span>
+              </button>
+              <button id="bet-btn" class="btn btn-action btn-bet" disabled>
+                <span class="action-name">Bet</span>
+                <span class="action-hint">下注</span>
+              </button>
+              <button id="call-btn" class="btn btn-action btn-call" disabled>
+                <span class="action-name">Call</span>
+                <span class="action-hint" id="call-amount">跟注 0</span>
+              </button>
+              <button id="raise-btn" class="btn btn-action btn-raise" disabled>
+                <span class="action-name">Raise</span>
+                <span class="action-hint">加注</span>
+              </button>
+              <button id="fold-btn" class="btn btn-action btn-fold" disabled>
+                <span class="action-name">Fold</span>
+                <span class="action-hint">弃牌</span>
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="game-info-right">
-          <div class="pot-display">
-            <span class="pot-label">底池</span>
-            <span class="pot-amount" id="pot-amount">0</span>
-          </div>
-          <div class="current-bet-display">
-            <span class="bet-label">当前下注</span>
-            <span class="bet-amount" id="current-bet-amount">0</span>
-          </div>
+
+        <div id="action-log" class="action-log">
+          <div class="log-header">操作日志</div>
+          <div id="log-entries" class="log-entries"></div>
+        </div>
+</div>
+    </div>
+
+    <div id="toast" class="toast hidden">
+      <span id="toast-message"></span>
+    </div>
+
+    <div id="bet-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3 id="modal-title">下注</h3>
+        <div class="bet-input-group">
+          <button class="bet-adjust" id="bet-minus">-</button>
+          <input type="number" id="bet-amount-input" min="10" value="10">
+          <button class="bet-adjust" id="bet-plus">+</button>
+        </div>
+        <div class="bet-presets">
+          <button class="bet-preset" data-amount="10">10</button>
+          <button class="bet-preset" data-amount="25">25</button>
+          <button class="bet-preset" data-amount="50">50</button>
+          <button class="bet-preset" data-amount="100">100</button>
+          <button class="bet-preset" data-amount="all">All-in</button>
+        </div>
+        <div class="modal-info">
+          <span>你拥有: <strong id="modal-chips">1000</strong> 筹码</span>
+        </div>
+        <div class="modal-actions">
+          <button id="modal-confirm" class="btn btn-primary">确认</button>
+          <button id="modal-cancel" class="btn btn-secondary">取消</button>
         </div>
       </div>
+    </div>
 
-      <div class="game-table">
-        <div class="table-center">
-<div class="pot-section">
-        </div>
-
-        <div id="game-players" class="game-players"></div>
-      </div>
-
-      <div class="action-area">
-        <div id="timer-display" class="timer-display hidden">
-          <span id="timer-value">30</span>
-        </div>
-        <div id="action-info" class="action-info">
-          <span id="turn-indicator">等待开始...</span>
-        </div>
-
-        <div id="action-buttons" class="action-buttons">
-          <button id="check-btn" class="btn btn-action btn-check" disabled>
-            <span class="action-name">Check</span>
-            <span class="action-hint">过牌</span>
-          </button>
-          <button id="bet-btn" class="btn btn-action btn-bet" disabled>
-            <span class="action-name">Bet</span>
-            <span class="action-hint">下注</span>
-          </button>
-          <button id="call-btn" class="btn btn-action btn-call" disabled>
-            <span class="action-name">Call</span>
-            <span class="action-hint" id="call-amount">跟注 0</span>
-          </button>
-          <button id="raise-btn" class="btn btn-action btn-raise" disabled>
-            <span class="action-name">Raise</span>
-            <span class="action-hint">加注</span>
-          </button>
-          <button id="fold-btn" class="btn btn-action btn-fold" disabled>
-            <span class="action-name">Fold</span>
-            <span class="action-hint">弃牌</span>
-          </button>
+    <div id="result-modal" class="modal hidden">
+      <div class="modal-content result-content">
+        <h3 id="result-title">结算</h3>
+        <div id="result-message"></div>
+        <div class="modal-actions">
+          <button id="result-continue" class="btn btn-primary">继续游戏</button>
+          <button id="result-close" class="btn btn-secondary">返回大厅</button>
         </div>
       </div>
+    </div>
 
-      <div id="bet-modal" class="modal hidden">
-        <div class="modal-content">
-          <h3 id="modal-title">下注</h3>
-          <div class="bet-input-group">
-            <button class="bet-adjust" id="bet-minus">-</button>
-            <input type="number" id="bet-amount-input" min="10" value="10">
-            <button class="bet-adjust" id="bet-plus">+</button>
-          </div>
-          <div class="bet-presets">
-            <button class="bet-preset" data-amount="10">10</button>
-            <button class="bet-preset" data-amount="25">25</button>
-            <button class="bet-preset" data-amount="50">50</button>
-            <button class="bet-preset" data-amount="100">100</button>
-            <button class="bet-preset" data-amount="all">All-in</button>
-          </div>
-          <div class="modal-info">
-            <span>你拥有: <strong id="modal-chips">1000</strong> 筹码</span>
-          </div>
-          <div class="modal-actions">
-            <button id="modal-confirm" class="btn btn-primary">确认</button>
-            <button id="modal-cancel" class="btn btn-secondary">取消</button>
-          </div>
+    <div id="settings-modal" class="modal hidden">
+      <div class="modal-content">
+        <h3 id="settings-title">游戏配置</h3>
+        <div class="setting-item">
+          <label>最小下注: <span id="min-bet-value">10</span></label>
+          <input type="range" id="min-bet-input" min="5" max="100" value="10">
         </div>
-      </div>
-
-      <div id="toast" class="toast hidden">
-        <span id="toast-message"></span>
-      </div>
-
-      <div id="result-modal" class="modal hidden">
-        <div class="modal-content result-content">
-          <h3 id="result-title">结算</h3>
-          <div id="result-message"></div>
-          <button id="result-close" class="btn btn-primary">确定</button>
+        <div class="setting-item">
+          <label>操作时间: <span id="timer-input-value">30</span>秒</label>
+          <input type="range" id="timer-input" min="10" max="120" value="30">
+        </div>
+        <div class="setting-item">
+          <label>初始筹码: <span id="chips-value">1000</span></label>
+          <input type="range" id="chips-input" min="100" max="10000" step="100" value="1000">
+        </div>
+        <div class="modal-actions">
+          <button id="settings-restore" class="btn btn-secondary">还原默认</button>
+          <button id="settings-save" class="btn btn-primary">保存并应用</button>
+          <button id="settings-cancel" class="btn btn-secondary">取消</button>
         </div>
       </div>
     </div>

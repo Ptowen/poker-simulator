@@ -5,14 +5,26 @@
 const GameState = require('./GameState');
 
 class GameRoom {
-  constructor(roomId, hostSocketId) {
+  constructor(roomId, hostSocketId, settings = {}) {
     this.roomId = roomId;
     this.hostSocketId = hostSocketId;
-    this.gameState = new GameState();
+    this.settings = {
+      minBet: settings.minBet || 10,
+      timer: settings.timer || 30,
+      initialChips: settings.initialChips || 1000
+    };
+    this.gameState = new GameState(this.settings);
     this.gameStarted = false;
     this.createdAt = Date.now();
     this.playerSockets = new Map();
     this.disconnectedPlayers = new Map();
+  }
+
+  updateSettings(newSettings) {
+    if (newSettings.minBet) this.settings.minBet = newSettings.minBet;
+    if (newSettings.timer) this.settings.timer = newSettings.timer;
+    if (newSettings.initialChips) this.settings.initialChips = newSettings.initialChips;
+    this.gameState.applySettings(newSettings);
   }
 
   addPlayer(socketId, name) {
@@ -115,13 +127,13 @@ class GameRoom {
     }
 
     this.gameStarted = false;
-    this.gameState = new GameState();
+    this.gameState = new GameState(this.settings);
 
     for (const playerData of existingPlayers) {
       this.gameState.addPlayer(playerData.socketId, playerData.name);
       const newPlayer = this.gameState.getPlayer(playerData.socketId);
       if (newPlayer) {
-        newPlayer.chips = playerData.chips || 1000;
+        newPlayer.chips = playerData.chips || this.settings.initialChips;
       }
     }
   }
@@ -138,7 +150,8 @@ class GameRoom {
       currentBetAmount: this.gameState.currentBetAmount,
       minBet: this.gameState.minBet,
       bettingRound: this.gameState.bettingRound,
-      currentPlayerSocketId: this.gameState.getCurrentPlayerSocketId()
+      currentPlayerSocketId: this.gameState.getCurrentPlayerSocketId(),
+      settings: this.settings
     };
   }
 

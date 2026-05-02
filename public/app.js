@@ -51,9 +51,23 @@ const elements = {
   resultTitle: document.getElementById('result-title'),
   resultMessage: document.getElementById('result-message'),
   resultClose: document.getElementById('result-close'),
+  resultContinue: document.getElementById('result-continue'),
   roomList: document.getElementById('room-list'),
   refreshRoomsBtn: document.getElementById('refresh-rooms-btn'),
-  roomListContainer: document.getElementById('room-list-container')
+  roomListContainer: document.getElementById('room-list-container'),
+  logEntries: document.getElementById('log-entries'),
+  settingsBtn: document.getElementById('settings-btn'),
+  settingsModal: document.getElementById('settings-modal'),
+  settingsTitle: document.getElementById('settings-title'),
+  minBetInput: document.getElementById('min-bet-input'),
+  minBetValue: document.getElementById('min-bet-value'),
+  timerInput: document.getElementById('timer-input'),
+  timerInputValue: document.getElementById('timer-input-value'),
+  chipsInput: document.getElementById('chips-input'),
+  chipsValue: document.getElementById('chips-value'),
+  settingsSave: document.getElementById('settings-save'),
+  settingsCancel: document.getElementById('settings-cancel'),
+  settingsRestore: document.getElementById('settings-restore')
 };
 
 let currentRoomId = null;
@@ -63,6 +77,60 @@ let isHost = false;
 let currentBetType = null;
 let timerInterval = null;
 let gameData = null;
+let actionLog = [];
+let currentSettings = {
+  minBet: 10,
+  timer: 30,
+  initialChips: 1000
+};
+
+function addLogEntry(type, message) {
+  actionLog.push({ type, message });
+  renderActionLog();
+}
+
+function renderActionLog() {
+  if (!elements.logEntries) return;
+  elements.logEntries.innerHTML = actionLog
+    .map(e => `<div class="log-entry ${e.type}">${e.message}</div>`)
+    .join('');
+  elements.logEntries.scrollTop = elements.logEntries.scrollHeight;
+}
+
+function clearActionLog() {
+  actionLog = [];
+  renderActionLog();
+}
+
+function openSettingsModal() {
+  elements.minBetInput.value = currentSettings.minBet;
+  elements.minBetValue.textContent = currentSettings.minBet;
+  elements.timerInput.value = currentSettings.timer;
+  elements.timerInputValue.textContent = currentSettings.timer;
+  elements.chipsInput.value = currentSettings.initialChips;
+  elements.chipsValue.textContent = currentSettings.initialChips;
+  elements.settingsModal.classList.remove('hidden');
+  document.body.appendChild(elements.settingsModal);
+}
+
+function closeSettingsModal() {
+  elements.settingsModal.classList.add('hidden');
+  document.getElementById('app').appendChild(elements.settingsModal);
+}
+
+function restoreDefaultSettings() {
+  const defaults = { minBet: 10, timer: 30, initialChips: 1000 };
+  elements.minBetInput.value = defaults.minBet;
+  elements.minBetValue.textContent = defaults.minBet;
+  elements.timerInput.value = defaults.timer;
+  elements.timerInputValue.textContent = defaults.timer;
+  elements.chipsInput.value = defaults.initialChips;
+  elements.chipsValue.textContent = defaults.initialChips;
+}
+
+function updateSettingsFromServer(settings) {
+  currentSettings = { ...settings };
+}
 
 function showView(viewName) {
   Object.values(views).forEach(view => view.classList.add('hidden'));
@@ -131,6 +199,48 @@ function initWaitingRoom() {
   elements.startGameBtn.addEventListener('click', () => {
     socket.emit('startGame');
   });
+
+  elements.settingsBtn.addEventListener('click', () => {
+    if (!isHost) {
+      showToast('仅房主可更改配置');
+      return;
+    }
+    openSettingsModal();
+  });
+
+  elements.settingsCancel.addEventListener('click', () => {
+    closeSettingsModal();
+  });
+
+  elements.settingsRestore.addEventListener('click', () => {
+    restoreDefaultSettings();
+  });
+
+  elements.settingsModal.addEventListener('click', (e) => {
+    if (e.target === elements.settingsModal) closeSettingsModal();
+  });
+
+  elements.minBetInput.addEventListener('input', () => {
+    elements.minBetValue.textContent = elements.minBetInput.value;
+  });
+
+  elements.timerInput.addEventListener('input', () => {
+    elements.timerInputValue.textContent = elements.timerInput.value;
+  });
+
+  elements.chipsInput.addEventListener('input', () => {
+    elements.chipsValue.textContent = elements.chipsInput.value;
+  });
+
+  elements.settingsSave.addEventListener('click', () => {
+    const settings = {
+      minBet: parseInt(elements.minBetInput.value),
+      timer: parseInt(elements.timerInput.value),
+      initialChips: parseInt(elements.chipsInput.value)
+    };
+    socket.emit('updateSettings', { settings });
+    closeSettingsModal();
+  });
 }
 
 function initGame() {
@@ -177,6 +287,17 @@ function initGame() {
 
   elements.resultClose.addEventListener('click', () => {
     elements.resultModal.classList.add('hidden');
+    socket.emit('leaveRoom');
+    currentRoomId = null;
+    isHost = false;
+    clearActionLog();
+    showView('lobby');
+  });
+
+  elements.resultContinue.addEventListener('click', () => {
+    elements.resultModal.classList.add('hidden');
+    updateWaitingRoom(gameData);
+    showView('waiting');
   });
 }
 
@@ -206,7 +327,7 @@ function closeBetModal() {
 
 function performAction(action, amount = null) {
   const player = getCurrentPlayer();
-  if (player.chips <= 0) {
+  if (player.chips <= 0 && action !== 'fold') {
     showError('筹码用尽，不可下注');
     return;
   }
@@ -347,16 +468,16 @@ function updateTimer(seconds) {
 
   elements.timerDisplay.classList.remove('hidden');
   elements.timerValue.textContent = seconds;
+  elements.timerDisplay.classList.toggle('warning', seconds <= 10);
 
   if (timerInterval) clearInterval(timerInterval);
 
+  let remaining = seconds;
   timerInterval = setInterval(() => {
-    seconds--;
-    elements.timerValue.textContent = seconds;
-    if (seconds <= 10) {
-      elements.timerDisplay.classList.add('warning');
-    }
-    if (seconds <= 0) {
+    remaining--;
+    elements.timerValue.textContent = remaining;
+    elements.timerDisplay.classList.toggle('warning', remaining <= 10);
+    if (remaining <= 0) {
       clearInterval(timerInterval);
       timerInterval = null;
     }
@@ -402,6 +523,9 @@ socket.on('createRoom', (data) => {
     currentPlayerSocketId = socket.id;
     isHost = true;
     currentPlayerName = elements.playerName.value.trim();
+    if (data.roomInfo.settings) {
+      updateSettingsFromServer(data.roomInfo.settings);
+    }
     updateWaitingRoom(data.roomInfo);
     showView('waiting');
     showToast('房间创建成功');
@@ -416,6 +540,9 @@ socket.on('joinRoom', (data) => {
     currentPlayerSocketId = socket.id;
     isHost = data.roomInfo.hostSocketId === socket.id;
     currentPlayerName = elements.playerName.value.trim();
+    if (data.roomInfo.settings) {
+      updateSettingsFromServer(data.roomInfo.settings);
+    }
     updateWaitingRoom(data.roomInfo);
     showView('waiting');
     showToast('加入房间成功');
@@ -454,8 +581,11 @@ socket.on('playerReconnected', (data) => {
 });
 
 socket.on('gameStarted', (data) => {
+  clearActionLog();
+  addLogEntry('round-start', '=== 游戏开始 ===');
   showView('game');
   updateRoomInfo(data.roomInfo);
+  elements.settingsBtn.style.display = 'none';
   showToast('游戏开始！');
 });
 
@@ -463,6 +593,9 @@ socket.on('playerActed', (data) => {
   updateRoomInfo(data.roomInfo);
   const actionNames = { check: '过牌', bet: '下注', call: '跟注', raise: '加注', fold: '弃牌' };
   const actionName = actionNames[data.action] || data.action;
+  const roundDisplay = (data.roomInfo?.bettingRound || 0) + 1;
+  let logClass = 'action ' + (data.action === 'check' ? 'action-check' : data.action === 'bet' ? 'action-bet' : data.action === 'call' ? 'action-call' : data.action === 'raise' ? 'action-raise' : 'action-fold');
+  addLogEntry(logClass, `[${roundDisplay}] ${data.playerName} ${actionName}${data.amount ? ' ' + data.amount : ''}`);
   if (data.reason === 'timeout') {
     showToast(`${data.playerName} 操作超时，强制弃牌`);
   } else {
@@ -482,16 +615,15 @@ socket.on('turnChanged', (data) => {
     elements.turnIndicator.textContent = `等待 ${data.currentPlayerName || '玩家'} 行动...`;
     elements.turnIndicator.classList.remove('your-turn');
   }
-
-  updateTimer(data.timerRemaining || 30);
 });
 
 socket.on('timerUpdate', (data) => {
-  updateTimer(data.timerRemaining || 30);
+  updateTimer(data.timerRemaining);
 });
 
 socket.on('bettingRoundEnded', (data) => {
   updateRoomInfo(data.roomInfo);
+  addLogEntry('round-end', `=== 第 ${data.round + 1} 轮结束 ===`);
   showToast(`第 ${data.round + 1} 轮下注结束`);
   updateTimer(null);
 });
@@ -501,6 +633,7 @@ socket.on('roundEnded', (data) => {
   updateTimer(null);
 
   if (data.winner) {
+    addLogEntry('winner', `${data.winner.name} 获胜，获得 ${data.winner.pot} 筹码`);
     let message = `<div class="winner-name">${data.winner.name}</div>获胜`;
     message += `<div>获得底池: <span class="pot-amount">${data.winner.pot}</span></div>`;
     showResultModal('本轮结束', message);
@@ -508,9 +641,17 @@ socket.on('roundEnded', (data) => {
 });
 
 socket.on('gameReady', (data) => {
-  showView('waiting');
   updateWaitingRoom(data.roomInfo);
-  showToast('准备开始新一局');
+  if (data.roomInfo.settings) {
+    updateSettingsFromServer(data.roomInfo.settings);
+  }
+  elements.settingsBtn.style.display = '';
+  showToast('房主可以开始新一局');
+});
+
+socket.on('settingsUpdated', (data) => {
+  updateSettingsFromServer(data.settings);
+  showToast('配置已更新');
 });
 
 socket.on('connect_error', (err) => {
@@ -526,6 +667,7 @@ document.addEventListener('DOMContentLoaded', () => {
   showView('lobby');
   elements.betModal.classList.add('hidden');
   elements.resultModal.classList.add('hidden');
+
   socket.emit('getRooms');
   setInterval(() => {
     if (views.lobby && !views.lobby.classList.contains('hidden')) {

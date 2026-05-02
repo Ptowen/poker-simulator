@@ -3,7 +3,7 @@
  */
 
 class GameState {
-  constructor() {
+  constructor(settings = {}) {
     this.players = new Map();
     this.currentBets = new Map();
     this.pot = 0;
@@ -12,16 +12,23 @@ class GameState {
     this.bettingRound = 0;
     this.activePlayers = [];
     this.turnActions = new Map();
-    this.minBet = 10;
+    this.minBet = settings.minBet || 10;
     this.timer = null;
-    this.timerDuration = 30;
+    this.timerDuration = settings.timer || 30;
+    this.initialChips = settings.initialChips || 1000;
     this.actionDeadline = null;
+  }
+
+  applySettings(settings) {
+    if (settings.minBet) this.minBet = settings.minBet;
+    if (settings.timer) this.timerDuration = settings.timer;
+    if (settings.initialChips) this.initialChips = settings.initialChips;
   }
 
   addPlayer(socketId, name) {
     this.players.set(socketId, {
       name: name,
-      chips: 1000,
+      chips: this.initialChips,
       socketId: socketId,
       hasFolded: false,
       hasActed: false
