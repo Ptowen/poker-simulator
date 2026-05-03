@@ -122,13 +122,16 @@ class GameState {
       return { success: false, message: '无需跟注' };
     }
 
-    const actualCall = Math.min(callAmount, player.chips);
-    this.pot += actualCall;
-    player.chips -= actualCall;
-    this.currentBets.set(socketId, playerBet + actualCall);
+    if (player.chips < callAmount) {
+      return { success: false, message: '筹码不足，当前版本暂不支持All-in' };
+    }
+
+    this.pot += callAmount;
+    player.chips -= callAmount;
+    this.currentBets.set(socketId, playerBet + callAmount);
     player.hasActed = true;
 
-    return { success: true, amount: actualCall };
+    return { success: true, amount: callAmount };
   }
 
   raise(socketId, amount) {

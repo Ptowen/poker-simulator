@@ -83,6 +83,11 @@ let currentSettings = {
   timer: 30,
   initialChips: 1000
 };
+const defaultSettings = {
+  minBet: 10,
+  timer: 30,
+  initialChips: 1000
+};
 
 function addLogEntry(type, message) {
   actionLog.push({ type, message });
@@ -102,13 +107,43 @@ function clearActionLog() {
   renderActionLog();
 }
 
+function fillSettingsForm(settings) {
+  elements.minBetInput.value = settings.minBet;
+  elements.minBetValue.textContent = settings.minBet;
+  elements.timerInput.value = settings.timer;
+  elements.timerInputValue.textContent = settings.timer;
+  elements.chipsInput.value = settings.initialChips;
+  elements.chipsValue.textContent = settings.initialChips;
+}
+
+function emitWithAck(eventName, payload, onSuccess) {
+  let data = payload;
+  let successHandler = onSuccess;
+
+  if (typeof payload === 'function') {
+    successHandler = payload;
+    data = undefined;
+  }
+
+  const ackHandler = (response) => {
+    if (response && response.success === false) {
+      showError(response.message || '操作失败');
+      return;
+    }
+    if (typeof successHandler === 'function') {
+      successHandler(response);
+    }
+  };
+
+  if (data === undefined) {
+    socket.emit(eventName, ackHandler);
+  } else {
+    socket.emit(eventName, data, ackHandler);
+  }
+}
+
 function openSettingsModal() {
-  elements.minBetInput.value = currentSettings.minBet;
-  elements.minBetValue.textContent = currentSettings.minBet;
-  elements.timerInput.value = currentSettings.timer;
-  elements.timerInputValue.textContent = currentSettings.timer;
-  elements.chipsInput.value = currentSettings.initialChips;
-  elements.chipsValue.textContent = currentSettings.initialChips;
+  fillSettingsForm(currentSettings);
 
   if (elements.settingsModal.parentElement.id !== 'app') {
     document.getElementById('app').appendChild(elements.settingsModal);
@@ -122,13 +157,7 @@ function closeSettingsModal() {
 }
 
 function restoreDefaultSettings() {
-  const defaults = { minBet: 10, timer: 30, initialChips: 1000 };
-  elements.minBetInput.value = defaults.minBet;
-  elements.minBetValue.textContent = defaults.minBet;
-  elements.timerInput.value = defaults.timer;
-  elements.timerInputValue.textContent = defaults.timer;
-  elements.chipsInput.value = defaults.initialChips;
-  elements.chipsValue.textContent = defaults.initialChips;
+  fillSettingsForm(defaultSettings);
 }
 
 function updateSettingsFromServer(settings) {
@@ -162,7 +191,7 @@ function initLobby() {
       showError('请输入昵称');
       return;
     }
-    socket.emit('createRoom', { playerName: name });
+    emitWithAck('createRoom', { playerName: name });
   });
 
   elements.joinRoomBtn.addEventListener('click', () => {
@@ -176,7 +205,7 @@ function initLobby() {
       showError('请输入房间号');
       return;
     }
-    socket.emit('joinRoom', { playerName: name, roomId: roomId });
+    emitWithAck('joinRoom', { playerName: name, roomId: roomId });
   });
 
   elements.refreshRoomsBtn.addEventListener('click', () => {
@@ -186,10 +215,11 @@ function initLobby() {
 
 function initWaitingRoom() {
   elements.leaveRoomBtn.addEventListener('click', () => {
-    socket.emit('leaveRoom');
-    currentRoomId = null;
-    isHost = false;
-    showView('lobby');
+    emitWithAck('leaveRoom', () => {
+      currentRoomId = null;
+      isHost = false;
+      showView('lobby');
+    });
   });
 
   elements.copyRoomCode.addEventListener('click', () => {
@@ -200,7 +230,7 @@ function initWaitingRoom() {
   });
 
   elements.startGameBtn.addEventListener('click', () => {
-    socket.emit('startGame');
+    emitWithAck('startGame');
   });
 
   elements.settingsBtn.addEventListener('click', () => {
@@ -229,8 +259,9 @@ function initWaitingRoom() {
       timer: parseInt(elements.timerInput.value),
       initialChips: parseInt(elements.chipsInput.value)
     };
-    socket.emit('updateSettings', { settings });
-    closeSettingsModal();
+    emitWithAck('updateSettings', { settings }, () => {
+      closeSettingsModal();
+    });
   });
 
   elements.settingsCancel.addEventListener('click', () => {
@@ -299,7 +330,6 @@ function initGame() {
 
   elements.resultContinue.addEventListener('click', () => {
     elements.resultModal.classList.add('hidden');
-    updateWaitingRoom(gameData);
     showView('waiting');
   });
 }
@@ -334,7 +364,7 @@ function performAction(action, amount = null) {
     showError('筹码用尽，不可下注');
     return;
   }
-  socket.emit('playerAction', { action, amount });
+  emitWithAck('playerAction', { action, amount });
 }
 
 function getCurrentPlayer() {
@@ -393,7 +423,7 @@ function renderRoomList(rooms) {
         showError('请输入昵称');
         return;
       }
-      socket.emit('joinRoom', { playerName: name, roomId: room.roomId });
+      emitWithAck('joinRoom', { playerName: name, roomId: room.roomId });
     });
 
     elements.roomList.appendChild(roomEl);
@@ -644,6 +674,7 @@ socket.on('roundEnded', (data) => {
 });
 
 socket.on('gameReady', (data) => {
+  gameData = data.roomInfo;
   updateWaitingRoom(data.roomInfo);
   if (data.roomInfo.settings) {
     updateSettingsFromServer(data.roomInfo.settings);

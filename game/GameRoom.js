@@ -47,23 +47,26 @@ class GameRoom {
     const player = this.gameState.getPlayer(oldSocketId);
     if (!player) return { success: false, message: '玩家不存在' };
 
-    const playerName = player.name;
-    const playerChips = player.chips;
-    const playerFolded = player.hasFolded;
+    const currentBet = this.gameState.currentBets.get(oldSocketId) || 0;
 
-    this.gameState.removePlayer(oldSocketId);
-    this.gameState.addPlayer(socketId, playerName);
-    const newPlayer = this.gameState.getPlayer(socketId);
-    if (newPlayer) {
-      newPlayer.chips = playerChips;
-      newPlayer.hasFolded = playerFolded;
+    this.gameState.players.delete(oldSocketId);
+    player.socketId = socketId;
+    this.gameState.players.set(socketId, player);
+
+    this.gameState.currentBets.delete(oldSocketId);
+    this.gameState.currentBets.set(socketId, currentBet);
+
+    this.gameState.activePlayers = this.gameState.activePlayers.map(id =>
+      id === oldSocketId ? socketId : id
+    );
+
+    if (this.hostSocketId === oldSocketId) {
+      this.hostSocketId = socketId;
     }
 
     this.disconnectedPlayers.delete(oldSocketId);
     this.playerSockets.set(socketId, socketId);
     this.playerSockets.delete(oldSocketId);
-
-    this.gameState.rebuildActivePlayers();
 
     return {
       success: true,
@@ -79,6 +82,8 @@ class GameRoom {
         name: player.name,
         chips: player.chips,
         hasFolded: player.hasFolded,
+        hasActed: player.hasActed,
+        currentBet: this.gameState.currentBets.get(socketId) || 0,
         disconnectedAt: Date.now()
       });
     }

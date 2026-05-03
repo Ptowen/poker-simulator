@@ -102,11 +102,16 @@ class SocketEvents {
 
     console.log(`房间创建: ${roomId} by ${playerName}`);
 
-    socket.emit('createRoom', {
-      success: true,
+    const response = {
       roomId: roomId,
       roomInfo: room.getInfo()
+    };
+
+    socket.emit('createRoom', {
+      success: true,
+      ...response
     });
+    this.sendSuccess(callback, response);
   }
 
   handleJoinRoom(socket, data, callback) {
@@ -152,11 +157,16 @@ class SocketEvents {
       roomInfo: room.getInfo()
     });
 
-    socket.emit('joinRoom', {
-      success: true,
+    const response = {
       roomId: roomId,
       roomInfo: room.getInfo()
+    };
+
+    socket.emit('joinRoom', {
+      success: true,
+      ...response
     });
+    this.sendSuccess(callback, response);
   }
 
   handleLeaveRoom(socket, callback) {
@@ -264,7 +274,9 @@ class SocketEvents {
     this.sendPlayerUpdate(roomId);
     this.startTurnTimer(roomId);
 
-    socket.emit('startGame', { success: true, roomInfo: room.getInfo() });
+    const response = { roomInfo: room.getInfo() };
+    socket.emit('startGame', { success: true, ...response });
+    this.sendSuccess(callback, response);
   }
 
   handleUpdateSettings(socket, data, callback) {
@@ -376,17 +388,7 @@ class SocketEvents {
       roomInfo: room.getInfo()
     });
 
-    if (room.isOnlyOnePlayerLeft()) {
-      this.handleRoundEnd(roomId);
-    } else if (room.gameState.isBettingRoundOver()) {
-      this.handleBettingRoundEnd(roomId);
-    } else {
-      const nextPlayerId = room.gameState.nextPlayer();
-      if (nextPlayerId) {
-        this.sendPlayerUpdate(roomId);
-        this.startTurnTimer(roomId);
-      }
-    }
+    this.resolveRoundProgress(roomId);
 
     this.sendSuccess(callback, { success: true });
   }
@@ -407,6 +409,23 @@ class SocketEvents {
     this.startTurnTimer(roomId);
   }
 
+  resolveRoundProgress(roomId) {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+
+    if (room.isOnlyOnePlayerLeft()) {
+      this.handleRoundEnd(roomId);
+    } else if (room.gameState.isBettingRoundOver()) {
+      this.handleBettingRoundEnd(roomId);
+    } else {
+      const nextPlayerId = room.gameState.nextPlayer();
+      if (nextPlayerId) {
+        this.sendPlayerUpdate(roomId);
+        this.startTurnTimer(roomId);
+      }
+    }
+  }
+
   handleRoundEnd(roomId) {
     const room = this.rooms.get(roomId);
     if (!room) return;
@@ -414,7 +433,7 @@ class SocketEvents {
     room.gameState.stopTimer();
 
     const winnerId = room.gameState.activePlayers[0];
-    const winner = room.gameState.getPlayer(winnerId);
+    const winner = winnerId ? room.gameState.getPlayer(winnerId) : null;
 
     if (winner) {
       winner.chips += room.gameState.pot;
@@ -432,6 +451,9 @@ class SocketEvents {
 
     room.gameState.pot = 0;
     room.resetGame();
+    this.io.to(roomId).emit('gameReady', {
+      roomInfo: room.getInfo()
+    });
   }
 
   startTurnTimer(roomId) {
@@ -457,15 +479,7 @@ class SocketEvents {
           roomInfo: room.getInfo()
         });
 
-        if (room.isOnlyOnePlayerLeft()) {
-          this.handleRoundEnd(roomId);
-        } else if (room.gameState.isBettingRoundOver()) {
-          this.handleBettingRoundEnd(roomId);
-        } else {
-          room.gameState.nextPlayer();
-          this.sendPlayerUpdate(roomId);
-          this.startTurnTimer(roomId);
-        }
+        this.resolveRoundProgress(roomId);
       }
     });
 
@@ -498,8 +512,8 @@ class SocketEvents {
     }
 
     for (const [roomId, room] of this.rooms) {
-      for (const [oldSocketId, player] of room.gameState.players) {
-        if (player.name === playerName) {
+      for (const [oldSocketId, disconnected] of room.disconnectedPlayers) {
+        if (disconnected.name === playerName) {
           const result = room.reconnectPlayer(socket.id, oldSocketId);
           if (result.success) {
             this.playerRooms.set(socket.id, roomId);
@@ -530,15 +544,34 @@ class SocketEvents {
     if (roomId) {
       const room = this.rooms.get(roomId);
       if (room) {
+        const playerName = room.gameState.getPlayer(socket.id)?.name;
+        const wasCurrentPlayer = room.gameStarted && room.gameState.getCurrentPlayerSocketId() === socket.id;
+
         room.markDisconnected(socket.id);
+
+        if (wasCurrentPlayer) {
+          room.gameState.stopTimer();
+          const result = room.gameState.fold(socket.id);
+          if (result.success) {
+            this.io.to(roomId).emit('playerActed', {
+              socketId: socket.id,
+              playerName,
+              action: 'fold',
+              reason: 'disconnect',
+              amount: 0,
+              roomInfo: room.getInfo()
+            });
+            this.resolveRoundProgress(roomId);
+          }
+        }
+
         this.io.to(roomId).emit('playerDisconnected', {
           socketId: socket.id,
-          playerName: room.gameState.getPlayer(socket.id)?.name,
+          playerName,
           roomInfo: room.getInfo()
         });
       }
 
-      this.removePlayerFromRoom(socket, roomId);
       socket.leave(roomId);
     }
 
