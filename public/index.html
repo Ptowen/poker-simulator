@@ -181,35 +181,67 @@
 
     <div id="result-modal" class="modal hidden">
       <div class="modal-content result-content">
-        <h3 id="result-title">结算</h3>
-        <div id="result-message"></div>
+        <div class="result-header">
+          <h3 id="result-title">本轮结束</h3>
+          <p id="result-subtitle">等待下一局开始</p>
+        </div>
+        <div class="result-winner-card">
+          <div id="result-winner-avatar" class="result-winner-avatar">W</div>
+          <div class="result-winner-main">
+            <div class="result-winner-label">本局赢家</div>
+            <div id="result-winner-name" class="result-winner-name">玩家</div>
+          </div>
+          <div class="result-winner-badge">WIN</div>
+        </div>
+        <div class="result-pot-card">
+          <div class="result-pot-label">获得底池</div>
+          <div id="result-winner-pot" class="result-pot-value">0</div>
+        </div>
+        <div class="result-summary">
+          <div class="result-summary-item">
+            <span class="result-summary-key">结束原因</span>
+            <span id="result-reason" class="result-summary-value">玩家全部弃牌</span>
+          </div>
+          <div class="result-summary-item">
+            <span class="result-summary-key">房间号</span>
+            <span id="result-room-code" class="result-summary-value">----</span>
+          </div>
+          <div class="result-summary-item">
+            <span class="result-summary-key">结束轮次</span>
+            <span id="result-round" class="result-summary-value">第 1 轮</span>
+          </div>
+        </div>
+        <div class="result-chips-card">
+          <div class="result-section-title">本局后筹码</div>
+          <div id="result-chips-list" class="result-chips-list"></div>
+        </div>
         <div class="modal-actions">
-          <button id="result-continue" class="btn btn-primary">继续游戏</button>
+          <button id="result-continue" class="btn btn-primary">继续下一局</button>
           <button id="result-close" class="btn btn-secondary">返回大厅</button>
         </div>
       </div>
     </div>
+  </div>
 
-    <div id="settings-modal" class="modal hidden">
-      <div class="modal-content">
-        <h3 id="settings-title">游戏配置</h3>
-        <div class="setting-item">
-          <label>最小下注: <span id="min-bet-value">10</span></label>
-          <input type="range" id="min-bet-input" min="5" max="100" value="10">
-        </div>
-        <div class="setting-item">
-          <label>操作时间: <span id="timer-input-value">30</span>秒</label>
-          <input type="range" id="timer-input" min="10" max="120" value="30">
-        </div>
-        <div class="setting-item">
-          <label>初始筹码: <span id="chips-value">1000</span></label>
-          <input type="range" id="chips-input" min="100" max="10000" step="100" value="1000">
-        </div>
-        <div class="modal-actions">
-          <button id="settings-restore" class="btn btn-secondary">还原默认</button>
-          <button id="settings-save" class="btn btn-primary">保存并应用</button>
-          <button id="settings-cancel" class="btn btn-secondary">取消</button>
-        </div>
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3 id="settings-title">游戏配置</h3>
+      <div class="setting-item">
+        <label>最小下注: <span id="min-bet-value">10</span></label>
+        <input type="range" id="min-bet-input" min="5" max="100" value="10">
+      </div>
+      <div class="setting-item">
+        <label>操作时间: <span id="timer-input-value">30</span>秒</label>
+        <input type="range" id="timer-input" min="10" max="120" value="30">
+      </div>
+      <div class="setting-item">
+        <label>初始筹码: <span id="chips-value">1000</span></label>
+        <input type="range" id="chips-input" min="100" max="10000" step="100" value="1000">
+      </div>
+      <div class="modal-actions">
+        <button id="settings-restore" class="btn btn-secondary">还原默认</button>
+        <button id="settings-save" class="btn btn-primary">保存并应用</button>
+        <button id="settings-cancel" class="btn btn-secondary">取消</button>
       </div>
     </div>
   </div>

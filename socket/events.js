@@ -9,6 +9,7 @@ const DEFAULT_SETTINGS = {
   timer: 30,
   initialChips: 1000
 };
+const DISCONNECT_GRACE_MS = 2 * 60 * 1000;
 
 class SocketEvents {
   constructor(io) {
@@ -16,6 +17,7 @@ class SocketEvents {
     this.rooms = new Map();
     this.playerRooms = new Map();
     this.socketToPlayer = new Map();
+    this.disconnectCleanupTimers = new Map();
   }
 
   init() {
@@ -191,6 +193,7 @@ class SocketEvents {
     const result = room.removePlayer(socket.id);
     this.playerRooms.delete(socket.id);
     this.socketToPlayer.delete(socket.id);
+    this.clearDisconnectCleanup(socket.id);
 
     if (result.hostChanged) {
       this.io.to(roomId).emit('hostChanged', {
@@ -213,13 +216,70 @@ class SocketEvents {
     console.log(`${playerName} 离开房间 ${roomId}`);
   }
 
+  clearDisconnectCleanup(socketId) {
+    const timer = this.disconnectCleanupTimers.get(socketId);
+    if (timer) {
+      clearTimeout(timer);
+      this.disconnectCleanupTimers.delete(socketId);
+    }
+  }
+
+  scheduleDisconnectCleanup(roomId, socketId) {
+    this.clearDisconnectCleanup(socketId);
+
+    const timer = setTimeout(() => {
+      const room = this.rooms.get(roomId);
+      if (!room || !room.disconnectedPlayers.has(socketId)) {
+        this.disconnectCleanupTimers.delete(socketId);
+        return;
+      }
+
+      const playerName = room.disconnectedPlayers.get(socketId)?.name || room.gameState.getPlayer(socketId)?.name;
+      const result = room.removePlayer(socketId);
+      this.playerRooms.delete(socketId);
+      this.socketToPlayer.delete(socketId);
+      this.disconnectCleanupTimers.delete(socketId);
+
+      if (result.hostChanged) {
+        this.io.to(roomId).emit('hostChanged', {
+          newHostSocketId: result.newHostSocketId
+        });
+      }
+
+      this.io.to(roomId).emit('playerLeft', {
+        socketId,
+        playerName,
+        roomInfo: room.getInfo()
+      });
+
+      if (room.gameState.players.size === 0) {
+        room.gameState.stopTimer();
+        this.rooms.delete(roomId);
+        console.log(`房间 ${roomId} 已删除`);
+      }
+
+      console.log(`${playerName} 断线超时离开房间 ${roomId}`);
+    }, DISCONNECT_GRACE_MS);
+
+    this.disconnectCleanupTimers.set(socketId, timer);
+  }
+
   handleGetRooms(socket, callback) {
     const rooms = [];
     for (const [roomId, room] of this.rooms) {
+      const onlinePlayerCount = room.getOnlinePlayerCount();
+
+      if (onlinePlayerCount === 0) {
+        room.gameState.stopTimer();
+        this.rooms.delete(roomId);
+        console.log(`房间 ${roomId} 因无在线玩家已清理`);
+        continue;
+      }
+
       if (!room.gameStarted) {
         rooms.push({
           roomId: roomId,
-          playerCount: room.gameState.players.size,
+          playerCount: onlinePlayerCount,
           maxPlayers: 8
         });
       }
@@ -516,6 +576,7 @@ class SocketEvents {
         if (disconnected.name === playerName) {
           const result = room.reconnectPlayer(socket.id, oldSocketId);
           if (result.success) {
+            this.clearDisconnectCleanup(oldSocketId);
             this.playerRooms.set(socket.id, roomId);
             this.socketToPlayer.set(socket.id, { name: playerName, roomId });
             socket.join(roomId);
@@ -548,6 +609,7 @@ class SocketEvents {
         const wasCurrentPlayer = room.gameStarted && room.gameState.getCurrentPlayerSocketId() === socket.id;
 
         room.markDisconnected(socket.id);
+        this.scheduleDisconnectCleanup(roomId, socket.id);
 
         if (wasCurrentPlayer) {
           room.gameState.stopTimer();

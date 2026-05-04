@@ -104,9 +104,13 @@ class GameRoom {
     return { hostChanged: false };
   }
 
+  getOnlinePlayerCount() {
+    return this.gameState.players.size - this.disconnectedPlayers.size;
+  }
+
   startGame() {
-    if (this.gameState.players.size < 2) {
-      return { success: false, message: '需要至少2名玩家才能开始' };
+    if (this.getOnlinePlayerCount() < 2) {
+      return { success: false, message: '需要至少2名在线玩家才能开始' };
     }
 
     this.gameStarted = true;

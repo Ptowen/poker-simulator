@@ -49,7 +49,14 @@ const elements = {
   timerValue: document.getElementById('timer-value'),
   resultModal: document.getElementById('result-modal'),
   resultTitle: document.getElementById('result-title'),
-  resultMessage: document.getElementById('result-message'),
+  resultSubtitle: document.getElementById('result-subtitle'),
+  resultWinnerAvatar: document.getElementById('result-winner-avatar'),
+  resultWinnerName: document.getElementById('result-winner-name'),
+  resultWinnerPot: document.getElementById('result-winner-pot'),
+  resultReason: document.getElementById('result-reason'),
+  resultRoomCode: document.getElementById('result-room-code'),
+  resultRound: document.getElementById('result-round'),
+  resultChipsList: document.getElementById('result-chips-list'),
   resultClose: document.getElementById('result-close'),
   resultContinue: document.getElementById('result-continue'),
   roomList: document.getElementById('room-list'),
@@ -107,6 +114,25 @@ function clearActionLog() {
   renderActionLog();
 }
 
+function renderResultChips(players, winnerName) {
+  if (!elements.resultChipsList) return;
+
+  const sortedPlayers = [...(players || [])].sort((a, b) => b.chips - a.chips);
+  elements.resultChipsList.innerHTML = sortedPlayers.map(player => {
+    const isWinner = player.name === winnerName;
+    return `
+      <div class="result-chip-row${isWinner ? ' is-winner' : ''}">
+        <div class="result-chip-player">
+          <span class="result-chip-name">${player.name}</span>
+          ${isWinner ? '<span class="result-chip-tag">赢家</span>' : ''}
+          ${player.hasFolded ? '<span class="result-chip-tag muted">已弃牌</span>' : ''}
+        </div>
+        <div class="result-chip-value">${player.chips}</div>
+      </div>
+    `;
+  }).join('');
+}
+
 function fillSettingsForm(settings) {
   elements.minBetInput.value = settings.minBet;
   elements.minBetValue.textContent = settings.minBet;
@@ -144,11 +170,6 @@ function emitWithAck(eventName, payload, onSuccess) {
 
 function openSettingsModal() {
   fillSettingsForm(currentSettings);
-
-  if (elements.settingsModal.parentElement.id !== 'app') {
-    document.getElementById('app').appendChild(elements.settingsModal);
-  }
-
   elements.settingsModal.classList.remove('hidden');
 }
 
@@ -534,9 +555,16 @@ function updateWaitingRoom(roomInfo) {
   elements.startGameBtn.disabled = roomInfo.playerCount < 2 || !isHost;
 }
 
-function showResultModal(title, message) {
-  elements.resultTitle.textContent = title;
-  elements.resultMessage.innerHTML = message;
+function showResultModal(data) {
+  elements.resultTitle.textContent = '本轮结束';
+  elements.resultSubtitle.textContent = data.subtitle || '等待下一局开始';
+  elements.resultWinnerAvatar.textContent = (data.winnerName || '?').charAt(0).toUpperCase();
+  elements.resultWinnerName.textContent = data.winnerName || '未知玩家';
+  elements.resultWinnerPot.textContent = data.winnerPot || 0;
+  elements.resultReason.textContent = data.reasonText || '玩家全部弃牌';
+  elements.resultRoomCode.textContent = data.roomId || '----';
+  elements.resultRound.textContent = `第 ${data.round || 1} 轮`;
+  renderResultChips(data.players, data.winnerName);
   elements.resultModal.classList.remove('hidden');
 }
 
@@ -667,9 +695,15 @@ socket.on('roundEnded', (data) => {
 
   if (data.winner) {
     addLogEntry('winner', `${data.winner.name} 获胜，获得 ${data.winner.pot} 筹码`);
-    let message = `<div class="winner-name">${data.winner.name}</div>获胜`;
-    message += `<div>获得底池: <span class="pot-amount">${data.winner.pot}</span></div>`;
-    showResultModal('本轮结束', message);
+    showResultModal({
+      winnerName: data.winner.name,
+      winnerPot: data.winner.pot,
+      reasonText: data.reason === 'allFolded' ? '其余玩家已全部弃牌' : '本局已结算',
+      subtitle: data.reason === 'allFolded' ? '仅剩一名玩家未弃牌' : '等待下一局开始',
+      roomId: data.roomInfo?.roomId,
+      round: (data.roomInfo?.bettingRound || 0) + 1,
+      players: data.roomInfo?.players || []
+    });
   }
 });
 
