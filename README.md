@@ -9,7 +9,7 @@ AIGC:
     ReservedCode2: 3044022004e16906f2b637a4c3a0fffefea4aca6a3f7d95743bf2eddd9aa6ebe9d25686502204cec0aa40e38b75f015f4a1002dd6a2297703610d79d66093d72d6e8d1c3def8
 ---
 
-# 德州扑克下注模拟器 v1.1.2
+# 德州扑克下注模拟器 v1.1.4
 
 Texas Hold'em Betting Simulator - 多人实时下注系统
 

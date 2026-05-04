@@ -1,6 +1,6 @@
 {
   "name": "poker-simulator",
-  "version": "1.0.0",
+  "version": "1.1.4",
   "description": "德州扑克下注流程模拟器",
   "main": "server.js",
   "scripts": {
